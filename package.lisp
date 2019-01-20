@@ -8,4 +8,6 @@
   (:export #:parametric-function
            #:spiral
            #:fractal-tree
+           #:animate
+           #:animated-parametric-function
            ))
