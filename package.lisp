@@ -10,4 +10,5 @@
            #:fractal-tree
            #:animate
            #:animated-parametric-function
+           #:random-threads
            ))
