@@ -182,16 +182,26 @@
   (complex (+ (random (- real-max real-min)) real-min)
            (+ (random (- imag-max imag-min)) imag-min)))
 
-(defun random-threads (output-directory mp4-file-name
+
+(defstruct ga-thread
+  (color (vec3 (random 1.0) (random 1.0) (random 1.0)))
+  (points (list (random-complex -1.0 1.0 -1.0 1.0))))
+
+(defun grow (gat)
+  (push (+ (car (ga-thread-points gat))
+           (random-complex -0.125 0.125 -0.125 0.125))
+        (ga-thread-points gat)))
+
+(defun random-threads (output-directory 
                            &key
                              (width 1200) (height 1200)
-                             (threads 100)
+                             (threads 10)
                              (duration 60)
                              (fps 30)
                              (line-width 0.8))
   (ensure-directories-exist output-directory)
   (let* ((frames (* duration fps))
-         (points (loop for i below threads collecting (random-complex -1.0 1.0 -1.0 1.0)))
+         (threads (loop for i below threads collecting (make-ga-thread)))
          (half-width (/ width 2.0))
          (half-height (/ height 2.0))
          (xs 120.0)
@@ -203,10 +213,11 @@
           (cl-cairo2:paint)
           (cl-cairo2:set-line-width line-width)
           (cl-cairo2:translate half-width half-height)
-          (cl-cairo2:set-source-rgba 0 1 0 1.0)
-          (cl-cairo2:move-to (* xs (realpart (car points))) (* ys (imagpart (car points))))
-          (dolist (value points)
-            (cl-cairo2:line-to (* xs (realpart value)) (* ys (imagpart value))))
-          (setf points (mapcar (lambda (x) (+ x (random-complex -0.125 0.125 -0.125 0.125))) points))
-          (format t "Frame ~a ~a~%" frame-number (car points))
-          (cl-cairo2:stroke))))))
+
+          (dolist (gat threads)
+            (cl-cairo2:set-source-rgba (vx (ga-thread-color gat)) (vy (ga-thread-color gat)) (vz (ga-thread-color gat)) 1.0)
+            (cl-cairo2:move-to (* xs (realpart (car (ga-thread-points gat)))) (* ys (imagpart (car (ga-thread-points gat)))))
+            (dolist (value (ga-thread-points gat))
+              (cl-cairo2:line-to (* xs (realpart value)) (* ys (imagpart value))))
+            (cl-cairo2:stroke)
+            (grow gat)))))))

@@ -4,7 +4,7 @@
 
 
 (defpackage #:gen-art
-  (:use #:cl)
+  (:use #:cl #:3d-vectors)
   (:export #:parametric-function
            #:spiral
            #:fractal-tree
