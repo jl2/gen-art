@@ -11,4 +11,7 @@
            #:animate
            #:animated-parametric-function
            #:random-threads
+
+           #:random-lines
+           #:random-halton-sequence-lines
            ))

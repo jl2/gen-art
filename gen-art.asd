@@ -9,6 +9,6 @@
   :license  "ISC"
   :version "0.0.1"
   :serial t
-  :depends-on (#:cl-cairo2 #:lparallel #:anim-utils #:bordeaux-fft)
+  :depends-on (#:cl-cairo2 #:lparallel #:anim-utils #:bordeaux-fft #:3d-vectors #:j-utils)
   :components ((:file "package")
                (:file "gen-art")))
