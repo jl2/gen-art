@@ -14,4 +14,9 @@
 
            #:random-lines
            #:random-halton-sequence-lines
+           #:random-cubics
+           #:centered-circles
+           #:gradient-sine-circles
+           #:bl-fractal-tree
+           #:bl-fractal-tests
            ))

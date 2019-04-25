@@ -292,3 +292,337 @@
         (cl-cairo2:stroke))))
   (when open-png
       (swank:eval-in-emacs (list 'find-file-other-window (namestring png-file-name)))))
+
+(defun random-cubics (file-name &key (count 1000) (width 1600) (height 1600) (open-png t))
+  (ensure-directories-exist file-name)
+  (let ((fwidth (coerce width 'double-float))
+        (fheight (coerce height 'double-float)))
+    (bl:with-objects ((img 'bl:image-core)
+                      (ctx 'bl:context-core)
+                      (path 'bl:path-core)
+                      (codec 'bl:image-codec-core)
+                      (linear 'bl:linear-gradient-values)
+                      (grad 'bl:gradient-core))
+
+      (bl:image-init-as img width height bl:+format-prgb32+)
+
+      (bl:context-init-as ctx img (cffi:null-pointer))
+      (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
+      (bl:context-fill-all ctx)
+
+      (setf (bl:linear-gradient-values.x0 linear) 0.0d0)
+      (setf (bl:linear-gradient-values.y0 linear) 0.0d0)
+      (setf (bl:linear-gradient-values.x1 linear) 0.0d0)
+      (setf (bl:linear-gradient-values.y1 linear) (coerce width 'double-float))
+
+
+      (dotimes (i count)
+        (bl:gradient-init-as grad
+                             bl:+gradient-type-linear+
+                             linear
+                             bl:+extend-mode-pad+ (cffi:null-pointer) 0  (cffi:null-pointer))
+
+        (bl:gradient-add-stop-rgba32 grad 0.0d0 (random #16rffffffff))
+        (dotimes (stops (random 12))
+          (bl:gradient-add-stop-rgba32 grad (random 1.0) (random #16rffffffff)))
+        (bl:gradient-add-stop-rgba32 grad 1.0d0 (random #16rffffffff))
+
+
+
+        (bl:path-init path)
+        (bl:path-move-to path (random fwidth) (random fheight))
+        (bl:path-cubic-to path
+                          (random fwidth) (random fheight)
+                          (random fwidth) (random fheight)
+                          (random fwidth) (random fheight))
+        (bl:context-set-comp-op ctx bl:+comp-op-src-over+)
+        (bl:context-set-stroke-style ctx grad)
+        (bl:context-set-stroke-width ctx (random 15.0d0))
+        (bl:context-set-stroke-cap ctx bl:+stroke-cap-position-start+ bl:+stroke-cap-round+)
+        (bl:context-set-stroke-cap ctx bl:+stroke-cap-position-end+ bl:+stroke-cap-round+)
+
+        #+sbcl (sb-int:with-float-traps-masked (:invalid) (bl:context-stroke-geometry ctx bl:+geometry-type-path+ path))
+        #-sbcl (bl:context-stroke-geometry ctx bl:+geometry-type-path+ path)
+
+        
+        (bl:path-reset path)
+        (bl:gradient-reset grad))
+
+      (bl:context-end ctx)
+
+      (bl:image-codec-init codec)
+      (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
+      (when (uiop/filesystem:file-exists-p file-name)
+        (delete-file file-name))
+
+      (bl:image-write-to-file img file-name codec))))
+
+(defun setup-window (ctx x-min y-min x-max y-max width height)
+  (let ((x-scale (/ width (- x-max x-min)))
+        (y-scale (/ height (- y-max y-min)))
+        (x-trans (- x-min))
+        (y-trans (- y-min)))
+    (cffi:with-foreign-array (arr (make-array 2 :initial-contents (list x-scale y-scale)) '(:array :double 2))
+      (bl:context-matrix-op ctx bl:+matrix2d-op-scale+ arr))
+
+    ;; (cffi:with-foreign-array (arr (make-array 2 :initial-contents (list (/ width 2.0) (/ height 2.0))) '(:array :double 2))
+    ;;   (bl:context-matrix-op ctx bl:+matrix2d-op-translate+ arr))
+    (cffi:with-foreign-array (arr (make-array 2 :initial-contents (list x-trans y-trans)) '(:array :double 2))
+      (bl:context-matrix-op ctx bl:+matrix2d-op-translate+ arr))))
+
+(defun centered-circles (file-name &key (width 1600) (height 1600))
+  (bl:with-objects ((img  'bl:image-core)
+                    (ctx  'bl:context-core)
+                    (codec  'bl:image-codec-core)
+                    (circle  'bl:circle))
+
+    ;; Initialize and clear image
+    (bl:image-init-as img width height bl:+format-prgb32+)
+    (bl:context-init-as ctx img (cffi:null-pointer))
+    (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
+    (bl:context-fill-all ctx)
+
+    (setup-window ctx -2.0 -2.0 2.0 2.0 width height)
+
+    (bl:context-set-comp-op ctx bl:+comp-op-src-over+)
+
+    (setf (bl:circle.cx circle) -0.5)
+    (setf (bl:circle.cy circle) -0.5)
+    (setf (bl:circle.r circle) 0.5)
+    (bl:context-set-fill-style-rgba32 ctx #16rffff0000)
+    (bl:context-fill-geometry ctx bl:+geometry-type-circle+ circle)
+
+    (setf (bl:circle.cx circle) 0.5)
+    (setf (bl:circle.cy circle) -0.5)
+    (setf (bl:circle.r circle) 0.5)
+    (bl:context-set-fill-style-rgba32 ctx #16rff0000ff)
+    (bl:context-fill-geometry ctx bl:+geometry-type-circle+ circle)
+
+    (setf (bl:circle.cx circle) -0.5)
+    (setf (bl:circle.cy circle) 0.5)
+    (setf (bl:circle.r circle) 0.5)
+    (bl:context-set-fill-style-rgba32 ctx #16rff00ff00)
+    (bl:context-fill-geometry ctx bl:+geometry-type-circle+ circle)
+
+    (setf (bl:circle.cx circle) 0.5)
+    (setf (bl:circle.cy circle) 0.5)
+    (setf (bl:circle.r circle) 0.5)
+    (bl:context-set-fill-style-rgba32 ctx #16rff00ffff)
+    (bl:context-fill-geometry ctx bl:+geometry-type-circle+ circle)
+
+    (bl:context-end ctx)
+    (bl:image-codec-init codec)
+    (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
+    (when (uiop/filesystem:file-exists-p file-name)
+      (delete-file file-name))
+    (bl:image-write-to-file img file-name codec)))
+
+(defun gradient-sine-circles (file-name &key (width 1600) (height 1600))
+  (bl:with-objects ((img  'bl:image-core)
+                    (ctx  'bl:context-core)
+                    (codec  'bl:image-codec-core)
+                    (circle  'bl:circle)
+                    (radial-vals 'bl:radial-gradient-values)
+                    (rad-grad 'bl:gradient-core)
+                    )
+
+    ;; Initialize and clear image
+    (bl:image-init-as img width height bl:+format-prgb32+)
+    (bl:context-init-as ctx img (cffi:null-pointer))
+    (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
+    (bl:context-fill-all ctx)
+
+    (setup-window ctx (- pi) (- pi) pi pi width height)
+
+    (setf (bl:radial-gradient-values.x0 radial-vals) 0.0)
+    (setf (bl:radial-gradient-values.y0 radial-vals) 0.0)
+    (setf (bl:radial-gradient-values.x1 radial-vals) 0.0)
+    (setf (bl:radial-gradient-values.y1 radial-vals) 0.0)
+    (setf (bl:radial-gradient-values.r0 radial-vals) 2.0)
+    (bl:gradient-init-as rad-grad
+                         bl:+gradient-type-radial+
+                         radial-vals
+                         bl:+extend-mode-reflect+ (cffi:null-pointer) 0  (cffi:null-pointer))
+
+    (bl:gradient-add-stop-rgba32 rad-grad 0.0 #16rff00ff00)
+    (bl:gradient-add-stop-rgba32 rad-grad 0.5 #16rff0000ff)
+    (bl:gradient-add-stop-rgba32 rad-grad 1.0 #16rffff0000)
+
+    (bl:context-set-comp-op ctx bl:+comp-op-src-over+)
+    (bl:context-set-fill-style ctx rad-grad)
+
+    (loop 
+       for dt = (/ (* 2 pi) 40000)
+       for t-min = (- pi)
+       for i below 40000
+       for tv = t-min then (+ t-min (* dt i))
+       do
+         (setf (bl:circle.cx circle) tv)
+         (setf (bl:circle.cy circle) (* 1.5 (sin (* 70 tv))))
+         (setf (bl:circle.r circle) 0.005)
+         (bl:context-fill-geometry ctx bl:+geometry-type-circle+ circle))
+
+    (bl:context-end ctx)
+    (bl:image-codec-init codec)
+    (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
+    (when (uiop/filesystem:file-exists-p file-name)
+      (delete-file file-name))
+    (bl:image-write-to-file img file-name codec)))
+
+(defun bl-fractal-tree (bmp-file-name
+                        &key
+                          (width 1200) (height 1200)
+                          (length 1.0)
+                          (maxdepth 4)
+                          (limbs 2)
+                          )
+  "Draw a fractal tree into the specified file, recursing to maxdepth, with the specified number of limbs at each level."
+  (let ((real-file-name (home-dir bmp-file-name))
+        (fwidth (coerce width 'double-float))
+        (fheight (coerce height 'double-float)))
+    (ensure-directories-exist real-file-name)
+    (bl:with-objects ((img 'bl:image-core)
+                      (ctx 'bl:context-core)
+                      (line 'bl:line)
+                      (codec 'bl:image-codec-core)
+                      (radial-vals 'bl:radial-gradient-values)
+                      (rad-grad 'bl:gradient-core))
+
+      (bl:image-init-as img width height bl:+format-prgb32+)
+
+      (bl:context-init-as ctx img (cffi:null-pointer))
+      (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
+      (bl:context-fill-all ctx)
+
+      (setup-window ctx -1.0 -1.0 1.0 1.0 fwidth fheight)
+
+      (setf (bl:radial-gradient-values.x0 radial-vals) 0.0)
+      (setf (bl:radial-gradient-values.y0 radial-vals) 0.0)
+      (setf (bl:radial-gradient-values.x1 radial-vals) 0.0)
+      (setf (bl:radial-gradient-values.y1 radial-vals) 0.0)
+      (setf (bl:radial-gradient-values.r0 radial-vals) 0.5)
+      (bl:gradient-init-as rad-grad
+                           bl:+gradient-type-radial+
+                           radial-vals
+                           bl:+extend-mode-reflect+
+                           (cffi:null-pointer)
+                           0
+                           (cffi:null-pointer))
+
+      (bl:gradient-add-stop-rgba32 rad-grad 0.0 #16rff00ff00)
+      (bl:gradient-add-stop-rgba32 rad-grad 0.5 #16rff0000ff)
+      (bl:gradient-add-stop-rgba32 rad-grad 1.0 #16rffff0000)
+
+      (bl:context-set-comp-op ctx bl:+comp-op-src-over+)
+      (bl:context-set-stroke-style ctx rad-grad)
+      (bl:context-set-comp-op ctx bl:+comp-op-src-over+)
+
+      (labels
+          ((to-cart (len angle)
+             "Convert a length and angle (polar coordinates) into x,y rectangular coordinates."
+             (values (* (cos (deg-to-rad angle)) len) (* (sin (deg-to-rad angle)) len)))
+           (draw-tree (x y length angle depth)
+             (multiple-value-bind (nx ny) (to-cart length angle)
+
+               (setf (bl:line.x0 line) x)
+               (setf (bl:line.y0 line) y)
+
+               (setf (bl:line.x1 line) (+ x nx))
+               (setf (bl:line.y1 line) (+ y ny))
+               (bl:context-set-stroke-width ctx  (* 0.01 (+ (/ depth maxdepth) 0.01)))
+               (bl:context-stroke-geometry ctx bl:+geometry-type-line+ line)
+
+               (when (> depth 0)
+                 (dotimes (i limbs)
+                   (let ((nnx (+ x nx))
+                         (nny (+ y ny))
+                         (nl (/ length 2.0))
+                         (ndepth (- depth 1))
+                         (ang (+ angle (/ -90 (1- limbs)) (* i (/ 180 (1+ limbs))))))
+                     (draw-tree nnx nny nl ang ndepth)))))))
+        (draw-tree 0.0 1.0 length -90.0 maxdepth))
+      (bl:context-end ctx)
+      (bl:image-codec-init codec)
+      (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
+      (when (uiop/filesystem:file-exists-p real-file-name)
+        (delete-file real-file-name))
+      (bl:image-write-to-file img bmp-file-name codec))))
+
+(defun bl-fractal-tests (bmp-file-name
+                        &key
+                          (width 1200) (height 1200)
+                          (length 1.0)
+                          (maxdepth 4)
+                          (limbs 2)
+                          )
+  "Draw a fractal tree into the specified file, recursing to maxdepth, with the specified number of limbs at each level."
+  (let ((real-file-name (home-dir bmp-file-name))
+        (fwidth (coerce width 'double-float))
+        (fheight (coerce height 'double-float)))
+    (ensure-directories-exist real-file-name)
+    (bl:with-objects ((img 'bl:image-core)
+                      (ctx 'bl:context-core)
+                      (line 'bl:line)
+                      (codec 'bl:image-codec-core)
+                      (radial-vals 'bl:radial-gradient-values)
+                      (rad-grad 'bl:gradient-core))
+
+      (bl:image-init-as img width height bl:+format-prgb32+)
+
+      (bl:context-init-as ctx img (cffi:null-pointer))
+      (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
+      (bl:context-fill-all ctx)
+
+      (setup-window ctx -1.0 -1.0 1.0 1.0 fwidth fheight)
+
+      (setf (bl:radial-gradient-values.x0 radial-vals) 0.0)
+      (setf (bl:radial-gradient-values.y0 radial-vals) 0.0)
+      (setf (bl:radial-gradient-values.x1 radial-vals) 0.0)
+      (setf (bl:radial-gradient-values.y1 radial-vals) 0.0)
+      (setf (bl:radial-gradient-values.r0 radial-vals) 0.5)
+      (bl:gradient-init-as rad-grad
+                           bl:+gradient-type-radial+
+                           radial-vals
+                           bl:+extend-mode-reflect+
+                           (cffi:null-pointer)
+                           0
+                           (cffi:null-pointer))
+
+      (bl:gradient-add-stop-rgba32 rad-grad 0.0 #16rff00ff00)
+      (bl:gradient-add-stop-rgba32 rad-grad 0.5 #16rff004400)
+      (bl:gradient-add-stop-rgba32 rad-grad 1.0 #16rff00aa00)
+
+      (bl:context-set-comp-op ctx bl:+comp-op-src-over+)
+      (bl:context-set-stroke-style ctx rad-grad)
+      (bl:context-set-comp-op ctx bl:+comp-op-src-over+)
+
+      (labels
+          ((to-cart (len angle)
+             "Convert a length and angle (polar coordinates) into x,y rectangular coordinates."
+             (values (* (cos (deg-to-rad angle)) len) (* (sin (deg-to-rad angle)) len)))
+           (draw-tree (x y length angle depth)
+             (multiple-value-bind (nx ny) (to-cart length angle)
+
+               (setf (bl:line.x0 line) x)
+               (setf (bl:line.y0 line) y)
+
+               (setf (bl:line.x1 line) (+ x nx))
+               (setf (bl:line.y1 line) (+ y ny))
+               (bl:context-set-stroke-width ctx  (* 0.02 (- (/ depth maxdepth) 0.01)))
+               (bl:context-stroke-geometry ctx bl:+geometry-type-line+ line)
+
+               (when (> depth 0)
+                 (dotimes (i (+ 2 (random limbs)))
+                   (let ((nnx (+ x nx))
+                         (nny (+ y ny))
+                         (nl (/ length 2.0))
+                         (ndepth (- depth 1))
+                         (ang (+ angle (- 90 (random 180.0)) (* i (/ (random 180.0) (1+ limbs))))))
+                     (draw-tree nnx nny nl ang ndepth)))))))
+        (draw-tree 0.0 1.0 length -90.0 maxdepth))
+      (bl:context-end ctx)
+      (bl:image-codec-init codec)
+      (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
+      (when (uiop/filesystem:file-exists-p real-file-name)
+        (delete-file real-file-name))
+      (bl:image-write-to-file img bmp-file-name codec))))
