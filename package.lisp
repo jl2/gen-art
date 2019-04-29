@@ -15,8 +15,12 @@
            #:random-lines
            #:random-halton-sequence-lines
            #:random-cubics
+           #:random-parametric-cubics
+           #:parametric-cubic-animation
            #:centered-circles
            #:gradient-sine-circles
            #:bl-fractal-tree
            #:bl-fractal-tests
+           #:bl-fractal-wtf
+           #:gradient-function-fill
            ))
