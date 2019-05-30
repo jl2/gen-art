@@ -274,26 +274,26 @@
   (when open-png
       (swank:eval-in-emacs (list 'find-file-other-window (namestring png-file-name)))))
 
-(defun random-lines (png-file-name &key (width 1200) (height 1200) (open-png t) (line-count 1000) (line-width 1.3))
-  (ensure-directories-exist png-file-name)
-  (let* ((half-width (/ width 2.0))
-         (half-height (/ height 2.0))
-         (xs half-width)
-         (ys half-height))
-    (cl-cairo2:with-png-file (png-file-name :argb32 width height)
-      (cl-cairo2:set-source-rgba 0.0 0.0 0.0 1.0)
-      (cl-cairo2:paint)
-      (cl-cairo2:set-line-width line-width)
-      (cl-cairo2:translate half-width half-height)
-      (dotimes (i line-count)
-        (cl-cairo2:set-source-rgba (random 1.0) (random 1.0) (random 1.0) 1.0)
-        (cl-cairo2:move-to (ju:random-between (- xs) xs) (ju:random-between (- ys) ys))
-        (cl-cairo2:line-to (ju:random-between (- xs) xs) (ju:random-between (- ys) ys))
-        (cl-cairo2:stroke))))
-  (when open-png
-      (swank:eval-in-emacs (list 'find-file-other-window (namestring png-file-name)))))
+;; (defun random-lines (png-file-name &key (width 1200) (height 1200) (open-png t) (line-count 1000) (line-width 1.3))
+;;   (ensure-directories-exist png-file-name)
+;;   (let* ((half-width (/ width 2.0))
+;;          (half-height (/ height 2.0))
+;;          (xs half-width)
+;;          (ys half-height))
+;;     (cl-cairo2:with-png-file (png-file-name :argb32 width height)
+;;       (cl-cairo2:set-source-rgba 0.0 0.0 0.0 1.0)
+;;       (cl-cairo2:paint)
+;;       (cl-cairo2:set-line-width line-width)
+;;       (cl-cairo2:translate half-width half-height)
+;;       (dotimes (i line-count)
+;;         (cl-cairo2:set-source-rgba (random 1.0) (random 1.0) (random 1.0) 1.0)
+;;         (cl-cairo2:move-to (ju:random-between (- xs) xs) (ju:random-between (- ys) ys))
+;;         (cl-cairo2:line-to (ju:random-between (- xs) xs) (ju:random-between (- ys) ys))
+;;         (cl-cairo2:stroke))))
+;;   (when open-png
+;;       (swank:eval-in-emacs (list 'find-file-other-window (namestring png-file-name)))))
 
-(defun random-cubics (file-name &key (count 1000) (width 1600) (height 1600) (open-png t))
+(defun random-cubics (file-name &key (count 1000) (width 1600) (height 1600))
   (ensure-directories-exist file-name)
   (let ((fwidth (coerce width 'double-float))
         (fheight (coerce height 'double-float)))
@@ -351,170 +351,11 @@
       (bl:context-end ctx)
 
       (bl:image-codec-init codec)
-      (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
+      (bl:image-codec-by-name codec "BMP")
       (when (uiop/filesystem:file-exists-p file-name)
         (delete-file file-name))
 
       (bl:image-write-to-file img file-name codec))))
-
-
-
-(defun setup-window (ctx x-min y-min x-max y-max width height)
-  (let ((x-scale (/ width (- x-max x-min)))
-        (y-scale (/ height (- y-max y-min)))
-        (x-trans (- x-min))
-        (y-trans (- y-min)))
-    (cffi:with-foreign-array (arr (make-array 2 :initial-contents (list x-scale y-scale)) '(:array :double 2))
-      (bl:context-matrix-op ctx bl:+matrix2d-op-scale+ arr))
-
-    ;; (cffi:with-foreign-array (arr (make-array 2 :initial-contents (list (/ width 2.0) (/ height 2.0))) '(:array :double 2))
-    ;;   (bl:context-matrix-op ctx bl:+matrix2d-op-translate+ arr))
-    (cffi:with-foreign-array (arr (make-array 2 :initial-contents (list x-trans y-trans)) '(:array :double 2))
-      (bl:context-matrix-op ctx bl:+matrix2d-op-translate+ arr))))
-
-(defun random-parametric-cubics (file-name &key
-                                             (count 1000)
-                                             (width 1600)
-                                             (height 1600)
-                                             (open-bmp t)
-                                             (jump-count 4)
-                                             (t-min 0.0)
-                                             (t-max (* 2 pi))
-                                             (t-win (/ pi 20))
-                                             (stroke-width 0.02)
-                                             (fx (lambda (tv) (cos tv)))
-                                             (fy (lambda (tv) (sin tv))))
-  (ensure-directories-exist file-name)
-  (bl:with-objects ((img bl:image-core)
-                    (ctx bl:context-core)
-                    (path bl:path-core)
-                    (codec bl:image-codec-core)
-                    (linear bl:linear-gradient-values)
-                    (grad bl:gradient-core))
-
-    (bl:image-init-as img width height bl:+format-prgb32+)
-
-    (bl:context-init-as ctx img (cffi:null-pointer))
-    (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
-    (bl:context-fill-all ctx)
-
-    (setf (bl:linear-gradient-values.x0 linear) 0.0d0)
-    (setf (bl:linear-gradient-values.y0 linear) 0.0d0)
-    (setf (bl:linear-gradient-values.x1 linear) 0.0d0)
-    (setf (bl:linear-gradient-values.y1 linear) (coerce width 'double-float))
-
-    (setup-window ctx -2.0 -2.0 2.0 2.0 width height)
-
-    (dotimes (i count)
-      (bl:gradient-init-as grad
-                           bl:+gradient-type-linear+
-                           linear
-                           bl:+extend-mode-pad+ (cffi:null-pointer) 0  (cffi:null-pointer))
-
-      (bl:gradient-add-stop-rgba32 grad 0.0d0 (random #16rffffffff))
-      (dotimes (stops (random 12))
-        (bl:gradient-add-stop-rgba32 grad (random 1.0) (random #16rffffffff)))
-      (bl:gradient-add-stop-rgba32 grad 1.0d0 (random #16rffffffff))
-
-      (bl:path-init path)
-      
-      (let* ((t-start (ju:random-between t-min t-max)))
-        (bl:path-move-to path
-                         (funcall fx t-start) (funcall fy t-start))
-        (loop
-           for i below jump-count
-           for t0 = t-start then (+ t2 (random t-win))
-           for t1 = (+ t0 (random t-win))
-           for t2 = (+ t1 (random t-win))
-           do
-             (bl:path-cubic-to path
-                               (funcall fx t0) (funcall fy t0)
-                               (funcall fx t1) (funcall fy t1)
-                               (funcall fx t2) (funcall fy t2)))
-        (bl:context-set-comp-op ctx bl:+comp-op-src-over+)
-        (bl:context-set-stroke-style ctx grad)
-        (bl:context-set-stroke-width ctx stroke-width)
-        (bl:context-set-stroke-cap ctx bl:+stroke-cap-position-start+ bl:+stroke-cap-round+)
-        (bl:context-set-stroke-cap ctx bl:+stroke-cap-position-end+ bl:+stroke-cap-round+)
-
-        #+sbcl (sb-int:with-float-traps-masked (:invalid) (bl:context-stroke-geometry ctx bl:+geometry-type-path+ path))
-        #-sbcl (bl:context-stroke-geometry ctx bl:+geometry-type-path+ path)
-
-        
-        (bl:path-reset path)
-        (bl:gradient-reset grad)))
-
-    (bl:context-end ctx)
-
-    (bl:image-codec-init codec)
-    (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
-    (when (uiop/filesystem:file-exists-p file-name)
-      (delete-file file-name))
-
-    (bl:image-write-to-file img file-name codec))
-  (when open-bmp
-    (swank:eval-in-emacs (list 'find-file-other-window (namestring file-name)))))
-
-(defstruct param-values
-  (a)
-  (b)
-  (c)
-  (d))
-
-(defun interpolate (values frame frame-count)
-  (let ((perc (* (1- (length values)) (/ frame frame-count 1.0))))
-    (multiple-value-bind (int frac) (floor perc)
-      (format t "~a ~a ~a~%" perc int frac)
-      (let ((first (aref values int))
-            (second (aref values (1+ int))))
-        (+ first (* frac (- second first)))))))
-
-(defun random-integer-array (count min-param max-param)
-  (sort (make-array (1+ count)
-              :element-type 'fixnum
-              :initial-contents (loop
-                                   for i upto count
-                                   collecting (ju:random-between min-param max-param)))
-        #'<))
-
-(defun parametric-cubic-animation (output-directory &key
-                                                      (duration 10.0)
-                                                      (param-count 10)
-                                                      (max-param 8)
-                                                      (min-param 2)
-                                                      (fps 30)
-                                                      (width 1600)
-                                                      (height 1600)
-                                                      (cubic-count 40)
-                                                      (thread-jumps 40)
-                                                      (t-win (/ pi 12))
-                                                      (stroke-width 0.00025))
-  (ensure-directories-exist output-directory)
-  (let ((frame-count (ceiling (* fps duration)))
-        (a-values (random-integer-array param-count min-param max-param))
-        (b-values (random-integer-array param-count min-param max-param))
-        (c-values (random-integer-array param-count min-param max-param))
-        (d-values (random-integer-array param-count min-param max-param)))
-
-    (loop
-       for frame below frame-count
-       do
-         (let ((a (interpolate a-values frame frame-count))
-               (b (interpolate b-values frame frame-count))
-               (c (interpolate c-values frame frame-count))
-               (d (interpolate d-values frame frame-count))
-               (file-name (format nil "~a/cubics-~5,'0d.bmp" output-directory frame)))
-           (format t "a: ~a~%b: ~a~%c: ~a~%d: ~a~%" a b c d)
-           (gen-art:random-parametric-cubics file-name
-                                             :width width
-                                             :height height
-                                             :count cubic-count
-                                             :open-bmp nil
-                                             :stroke-width stroke-width
-                                             :t-win t-win
-                                             :jump-count thread-jumps
-                                             :fx (lambda (tv) (* 1.5  (sin (* a tv)) (cos (* b tv)) (cos tv)))
-                                             :fy (lambda (tv) (* 1.5  (sin (* c tv)) (cos (* d tv)) (sin tv))))))))
 
 (defun centered-circles (file-name &key (width 1600) (height 1600))
   (bl:with-objects ((img  bl:image-core)
@@ -558,7 +399,7 @@
 
     (bl:context-end ctx)
     (bl:image-codec-init codec)
-    (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
+    (bl:image-codec-by-name codec "BMP")
     (when (uiop/filesystem:file-exists-p file-name)
       (delete-file file-name))
     (bl:image-write-to-file img file-name codec)))
@@ -610,7 +451,7 @@
 
     (bl:context-end ctx)
     (bl:image-codec-init codec)
-    (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
+    (bl:image-codec-by-name codec "BMP")
     (when (uiop/filesystem:file-exists-p file-name)
       (delete-file file-name))
     (bl:image-write-to-file img file-name codec)))
@@ -671,7 +512,7 @@
 
     (bl:context-end ctx)
     (bl:image-codec-init codec)
-    (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
+    (bl:image-codec-by-name codec "BMP")
     (when (uiop/filesystem:file-exists-p file-name)
       (delete-file file-name))
     (bl:image-write-to-file img file-name codec)))
@@ -751,7 +592,7 @@
         (draw-tree 0.0 1.0 length -90.0 maxdepth))
       (bl:context-end ctx)
       (bl:image-codec-init codec)
-      (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
+      (bl:image-codec-by-name codec "BMP")
       (when (uiop/filesystem:file-exists-p real-file-name)
         (delete-file real-file-name))
       (bl:image-write-to-file img bmp-file-name codec))))
@@ -830,7 +671,7 @@
         (draw-tree 0.0 1.0 length -90.0 maxdepth))
       (bl:context-end ctx)
       (bl:image-codec-init codec)
-      (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
+      (bl:image-codec-by-name codec "BMP")
       (when (uiop/filesystem:file-exists-p real-file-name)
         (delete-file real-file-name))
       (bl:image-write-to-file img bmp-file-name codec))))
@@ -911,7 +752,7 @@
         (draw-tree 0.0 1.0 length -90.0 maxdepth))
       (bl:context-end ctx)
       (bl:image-codec-init codec)
-      (bl:image-codec-find-by-name codec (bl:image-codec-built-in-codecs) "BMP")
+      (bl:image-codec-by-name codec "BMP")
       (when (uiop/filesystem:file-exists-p real-file-name)
         (delete-file real-file-name))
       (bl:image-write-to-file img bmp-file-name codec))))
@@ -992,3 +833,151 @@
 ;;                             :direction :output
 ;;                             :if-exists :supersede)
 ;;       (png:encode img output))))
+
+(defun setup-window (ctx x-min y-min x-max y-max width height)
+  (let ((x-scale (/ width (- x-max x-min)))
+        (y-scale (/ height (- y-max y-min)))
+        (x-trans (- x-min))
+        (y-trans (- y-min)))
+    (cffi:with-foreign-array (arr (make-array 2 :initial-contents (list x-scale y-scale)) '(:array :double 2))
+      (bl:context-matrix-op ctx bl:+matrix2d-op-scale+ arr))
+
+    (cffi:with-foreign-array (arr (make-array 2 :initial-contents (list x-trans y-trans)) '(:array :double 2))
+      (bl:context-matrix-op ctx bl:+matrix2d-op-translate+ arr))))
+
+(defun random-parametric-cubics (file-name &key
+                                             (count 1000)
+                                             (width 1600)
+                                             (height 1600)
+                                             (open-bmp t)
+                                             (jump-count 4)
+                                             (t-min 0.0)
+                                             (t-max (* 2 pi))
+                                             (t-win (/ pi 20))
+                                             (stroke-width 0.02)
+                                             (fx (lambda (tv) (cos tv)))
+                                             (fy (lambda (tv) (sin tv))))
+  (ensure-directories-exist file-name)
+  (bl:with-objects ((img bl:image-core)
+                    (ctx bl:context-core)
+                    (path bl:path-core)
+                    (codec bl:image-codec-core)
+                    (linear bl:linear-gradient-values)
+                    (grad bl:gradient-core))
+
+    (bl:image-init-as img width height bl:+format-prgb32+)
+
+    (bl:context-init-as ctx img (cffi:null-pointer))
+    (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
+    (bl:context-fill-all ctx)
+
+    (setf (bl:linear-gradient-values.x0 linear) 0.0d0)
+    (setf (bl:linear-gradient-values.y0 linear) 0.0d0)
+    (setf (bl:linear-gradient-values.x1 linear) 0.0d0)
+    (setf (bl:linear-gradient-values.y1 linear) (coerce width 'double-float))
+
+    (setup-window ctx -2.0 -2.0 2.0 2.0 width height)
+
+    (dotimes (i count)
+      (bl:gradient-init-as grad
+                           bl:+gradient-type-linear+
+                           linear
+                           bl:+extend-mode-pad+ (cffi:null-pointer) 0  (cffi:null-pointer))
+
+      (bl:gradient-add-stop-rgba32 grad 0.0d0 (random #16rffffffff))
+      (dotimes (stops (random 12))
+        (bl:gradient-add-stop-rgba32 grad (random 1.0) (random #16rffffffff)))
+      (bl:gradient-add-stop-rgba32 grad 1.0d0 (random #16rffffffff))
+
+      (bl:path-init path)
+      
+      (let* ((t-start (ju:random-between t-min t-max)))
+        (bl:path-move-to path
+                         (funcall fx t-start) (funcall fy t-start))
+        (loop
+           for i below jump-count
+           for t0 = t-start then (+ t2 (random t-win))
+           for t1 = (+ t0 (random t-win))
+           for t2 = (+ t1 (random t-win))
+           do
+             (bl:path-cubic-to path
+                               (funcall fx t0) (funcall fy t0)
+                               (funcall fx t1) (funcall fy t1)
+                               (funcall fx t2) (funcall fy t2)))
+        (bl:context-set-comp-op ctx bl:+comp-op-src-over+)
+        (bl:context-set-stroke-style ctx grad)
+        (bl:context-set-stroke-width ctx stroke-width)
+        (bl:context-set-stroke-cap ctx bl:+stroke-cap-position-start+ bl:+stroke-cap-round+)
+        (bl:context-set-stroke-cap ctx bl:+stroke-cap-position-end+ bl:+stroke-cap-round+)
+
+        #+sbcl (sb-int:with-float-traps-masked (:invalid) (bl:context-stroke-geometry ctx bl:+geometry-type-path+ path))
+        #-sbcl (bl:context-stroke-geometry ctx bl:+geometry-type-path+ path)
+
+        
+        (bl:path-reset path)
+        (bl:gradient-reset grad)))
+
+    (bl:context-end ctx)
+
+    (bl:image-codec-init codec)
+    (bl:image-codec-by-name codec "BMP")
+    (when (uiop/filesystem:file-exists-p file-name)
+      (delete-file file-name))
+
+    (bl:image-write-to-file img file-name codec))
+  (when open-bmp
+    (swank:eval-in-emacs (list 'find-file-other-window (namestring file-name)))))
+
+(defun interpolate (values idx frame frame-count)
+  (let ((perc (* (1- (array-dimension values 1)) (/ frame frame-count 1.0))))
+    (multiple-value-bind (int frac) (floor perc)
+      (let ((first (aref values idx int))
+            (second (aref values idx (1+ int))))
+        (+ first (* frac (- second first)))))))
+
+(defun random-integer-array (x-dim y-dim min-param max-param)
+  (make-array (list x-dim y-dim)
+              :element-type 'fixnum
+              :initial-contents (loop for i below x-dim collecting
+                                     (loop for i below y-dim
+                                        collecting (ju:random-between min-param max-param)))))
+
+(defun parametric-cubic-animation (output-directory &key
+                                                      (duration 10.0)
+                                                      (param-count 10)
+                                                      (max-param 8)
+                                                      (min-param 2)
+                                                      (fps 30)
+                                                      (width 1600)
+                                                      (height 1600)
+                                                      (cubic-count 40)
+                                                      (thread-jumps 40)
+                                                      (t-win (/ pi 12))
+                                                      (stroke-width 0.00025)
+                                                      (coefficients nil)
+                                                      )
+  (ensure-directories-exist output-directory)
+  (let ((frame-count (ceiling (* fps duration)))
+        (coeffs (if coefficients
+                    coefficients 
+                    (random-integer-array 4 param-count min-param max-param))))
+    (format t "Generating animation for: ~a~%" coeffs)
+    (loop
+       for frame below frame-count
+       do
+         (let ((a (interpolate coeffs 0 frame frame-count))
+               (b (interpolate coeffs 1 frame frame-count))
+               (c (interpolate coeffs 2 frame frame-count))
+               (d (interpolate coeffs 3 frame frame-count))
+               (file-name (format nil "~a/cubics-~5,'0d.bmp" output-directory frame)))
+           (gen-art:random-parametric-cubics file-name
+                                             :width width
+                                             :height height
+                                             :count cubic-count
+                                             :open-bmp nil
+                                             :stroke-width stroke-width
+                                             :t-win t-win
+                                             :jump-count thread-jumps
+                                             :fx (lambda (tv) (* 1.5  (sin (* a tv)) (cos (* b tv)) (cos tv)))
+                                             :fy (lambda (tv) (* 1.5  (sin (* c tv)) (cos (* d tv)) (sin tv))))))
+    coeffs))
