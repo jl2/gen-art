@@ -23,4 +23,5 @@
            #:bl-fractal-tests
            #:bl-fractal-wtf
            #:gradient-function-fill
+           #:quadtree-viz
            ))

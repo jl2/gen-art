@@ -293,22 +293,22 @@
 ;;   (when open-png
 ;;       (swank:eval-in-emacs (list 'find-file-other-window (namestring png-file-name)))))
 
-(defun random-cubics (file-name &key (count 1000) (width 1600) (height 1600))
+(defun random-cubics (file-name &key
+                                  (count 1000)
+                                  (width 1600)
+                                  (height 1600)
+                                  (image-type "BMP"))
   (ensure-directories-exist file-name)
   (let ((fwidth (coerce width 'double-float))
         (fheight (coerce height 'double-float)))
-    (bl:with-objects ((img bl:image-core)
-                      (ctx bl:context-core)
-                      (path bl:path-core)
-                      (codec bl:image-codec-core)
-                      (linear bl:linear-gradient-values)
-                      (grad bl:gradient-core))
-
-      (bl:image-init-as img width height bl:+format-prgb32+)
-
-      (bl:context-init-as ctx img (cffi:null-pointer))
-      (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
-      (bl:context-fill-all ctx)
+  (bl:with-image-context*
+      (img ctx file-name
+           :codec-name image-type
+           :width width
+           :height height)
+      ((path bl:path-core)
+       (linear bl:linear-gradient-values)
+       (grad bl:gradient-core))
 
       (setf (bl:linear-gradient-values.x0 linear) 0.0d0)
       (setf (bl:linear-gradient-values.y0 linear) 0.0d0)
@@ -346,28 +346,18 @@
 
         
         (bl:path-reset path)
-        (bl:gradient-reset grad))
+        (bl:gradient-reset grad)))))
 
-      (bl:context-end ctx)
-
-      (bl:image-codec-init codec)
-      (bl:image-codec-by-name codec "BMP")
-      (when (uiop/filesystem:file-exists-p file-name)
-        (delete-file file-name))
-
-      (bl:image-write-to-file img file-name codec))))
-
-(defun centered-circles (file-name &key (width 1600) (height 1600))
-  (bl:with-objects ((img  bl:image-core)
-                    (ctx  bl:context-core)
-                    (codec  bl:image-codec-core)
-                    (circle  bl:circle))
-
-    ;; Initialize and clear image
-    (bl:image-init-as img width height bl:+format-prgb32+)
-    (bl:context-init-as ctx img (cffi:null-pointer))
-    (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
-    (bl:context-fill-all ctx)
+(defun centered-circles (file-name &key
+                                     (width 1600)
+                                     (height 1600)
+                                     (image-type "BMP"))
+  (bl:with-image-context*
+      (img ctx file-name
+           :codec-name image-type
+           :width width
+           :height height)
+      ((circle  bl:circle))
 
     (setup-window ctx -2.0 -2.0 2.0 2.0 width height)
 
@@ -395,29 +385,14 @@
     (setf (bl:circle.cy circle) 0.5)
     (setf (bl:circle.r circle) 0.5)
     (bl:context-set-fill-style-rgba32 ctx #16rff00ffff)
-    (bl:context-fill-geometry ctx bl:+geometry-type-circle+ circle)
+    (bl:context-fill-geometry ctx bl:+geometry-type-circle+ circle)))
 
-    (bl:context-end ctx)
-    (bl:image-codec-init codec)
-    (bl:image-codec-by-name codec "BMP")
-    (when (uiop/filesystem:file-exists-p file-name)
-      (delete-file file-name))
-    (bl:image-write-to-file img file-name codec)))
-
-(defun gradient-sine-circles (file-name &key (width 1600) (height 1600))
-  (bl:with-objects ((img  bl:image-core)
-                    (ctx  bl:context-core)
-                    (codec  bl:image-codec-core)
-                    (circle  bl:circle)
-                    (radial-vals bl:radial-gradient-values)
-                    (rad-grad bl:gradient-core)
-                    )
-
-    ;; Initialize and clear image
-    (bl:image-init-as img width height bl:+format-prgb32+)
-    (bl:context-init-as ctx img (cffi:null-pointer))
-    (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
-    (bl:context-fill-all ctx)
+(defun gradient-sine-circles (file-name &key (width 1600) (height 1600) (image-type "BMP"))
+  (bl:with-image-context*
+      (img ctx file-name :width width :height height :codec-name image-type)
+      ((circle  bl:circle)
+       (radial-vals bl:radial-gradient-values)
+       (rad-grad bl:gradient-core))
 
     (setup-window ctx (- pi) (- pi) pi pi width height)
 
@@ -432,7 +407,7 @@
                          bl:+extend-mode-reflect+ (cffi:null-pointer) 0  (cffi:null-pointer))
 
     (bl:gradient-add-stop-rgba32 rad-grad 0.0 #16rff00ff00)
-    (bl:gradient-add-stop-rgba32 rad-grad 0.5 #16rff0000ff)
+    (bl:gradient-add-stop-rgba32 rad-grad 0.5 (random #16rffffffff))
     (bl:gradient-add-stop-rgba32 rad-grad 1.0 #16rffff0000)
 
     (bl:context-set-comp-op ctx bl:+comp-op-src-over+)
@@ -447,31 +422,23 @@
          (setf (bl:circle.cx circle) tv)
          (setf (bl:circle.cy circle) (* 1.5 (sin (* 70 tv))))
          (setf (bl:circle.r circle) 0.005)
-         (bl:context-fill-geometry ctx bl:+geometry-type-circle+ circle))
-
-    (bl:context-end ctx)
-    (bl:image-codec-init codec)
-    (bl:image-codec-by-name codec "BMP")
-    (when (uiop/filesystem:file-exists-p file-name)
-      (delete-file file-name))
-    (bl:image-write-to-file img file-name codec)))
+         (bl:context-fill-geometry ctx bl:+geometry-type-circle+ circle))))
 
 (defun gradient-function-fill (file-name &key
                                            (width 1600)
                                            (height 1600)
+                                           (image-type "BMP")
                                            (t-min (* -1 pi))
                                            (t-max (* 1 pi))
                                            (count 200)
                                            (radius 0.02)
                                            (fx (lambda (tv) (cos tv)))
                                            (fy (lambda (tv) (sin tv))))
-  (bl:with-objects ((img  bl:image-core)
-                    (ctx  bl:context-core)
-                    (codec  bl:image-codec-core)
-                    (circle  bl:circle)
-                    (radial-vals bl:radial-gradient-values)
-                    (rad-grad bl:gradient-core)
-                    )
+  (bl:with-image-context*
+      (img ctx file-name :width width :height height :codec-name image-type)
+      ((circle  bl:circle)
+       (radial-vals bl:radial-gradient-values)
+       (rad-grad bl:gradient-core))
 
     ;; Initialize and clear image
     (bl:image-init-as img width height bl:+format-prgb32+)
@@ -508,40 +475,27 @@
          (setf (bl:circle.cx circle) (funcall fx tv))
          (setf (bl:circle.cy circle) (funcall fy tv))
          (setf (bl:circle.r circle) radius)
-         (bl:context-fill-geometry ctx bl:+geometry-type-circle+ circle))
-
-    (bl:context-end ctx)
-    (bl:image-codec-init codec)
-    (bl:image-codec-by-name codec "BMP")
-    (when (uiop/filesystem:file-exists-p file-name)
-      (delete-file file-name))
-    (bl:image-write-to-file img file-name codec)))
+         (bl:context-fill-geometry ctx bl:+geometry-type-circle+ circle))))
 
 
-(defun bl-fractal-tree (bmp-file-name
+(defun bl-fractal-tree (file-name
                         &key
                           (width 1200) (height 1200)
+                          (image-type "BMP")
                           (length 1.0)
                           (maxdepth 4)
                           (limbs 2)
                           )
   "Draw a fractal tree into the specified file, recursing to maxdepth, with the specified number of limbs at each level."
-  (let ((real-file-name (home-dir bmp-file-name))
+  (let ((real-file-name (home-dir file-name))
         (fwidth (coerce width 'double-float))
         (fheight (coerce height 'double-float)))
     (ensure-directories-exist real-file-name)
-    (bl:with-objects ((img bl:image-core)
-                      (ctx bl:context-core)
-                      (line bl:line)
-                      (codec bl:image-codec-core)
-                      (radial-vals bl:radial-gradient-values)
-                      (rad-grad bl:gradient-core))
-
-      (bl:image-init-as img width height bl:+format-prgb32+)
-
-      (bl:context-init-as ctx img (cffi:null-pointer))
-      (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
-      (bl:context-fill-all ctx)
+  (bl:with-image-context*
+      (img ctx file-name :width width :height height :codec-name image-type)
+      ((line bl:line)
+       (radial-vals bl:radial-gradient-values)
+       (rad-grad bl:gradient-core))
 
       (setup-window ctx -1.0 -1.0 1.0 1.0 fwidth fheight)
 
@@ -589,46 +543,33 @@
                          (ndepth (- depth 1))
                          (ang (+ angle (/ -90 (1- limbs)) (* i (/ 180 (1+ limbs))))))
                      (draw-tree nnx nny nl ang ndepth)))))))
-        (draw-tree 0.0 1.0 length -90.0 maxdepth))
-      (bl:context-end ctx)
-      (bl:image-codec-init codec)
-      (bl:image-codec-by-name codec "BMP")
-      (when (uiop/filesystem:file-exists-p real-file-name)
-        (delete-file real-file-name))
-      (bl:image-write-to-file img bmp-file-name codec))))
+        (draw-tree 0.0 1.0 length -90.0 maxdepth)))))
 
-(defun bl-fractal-tests (bmp-file-name
-                        &key
-                          (width 1200) (height 1200)
-                          (length 1.0)
-                          (maxdepth 4)
-                          (limbs 2)
-                          )
+(defun bl-fractal-tests (file-name
+                         &key
+                           (width 1200) (height 1200)
+                           (image-type "BMP")
+                           (length 1.0)
+                           (maxdepth 4)
+                           (limbs 2))
   "Draw a fractal tree into the specified file, recursing to maxdepth, with the specified number of limbs at each level."
-  (let ((real-file-name (home-dir bmp-file-name))
+  (let ((real-file-name (home-dir file-name))
         (fwidth (coerce width 'double-float))
         (fheight (coerce height 'double-float)))
     (ensure-directories-exist real-file-name)
-    (bl:with-objects ((img bl:image-core)
-                      (ctx bl:context-core)
-                      (line bl:line)
-                      (codec bl:image-codec-core)
-                      (radial-vals bl:radial-gradient-values)
-                      (rad-grad bl:gradient-core))
-
-      (bl:image-init-as img width height bl:+format-prgb32+)
-
-      (bl:context-init-as ctx img (cffi:null-pointer))
-      (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
-      (bl:context-fill-all ctx)
+    (bl:with-image-context*
+        (img ctx file-name :width width :height height :codec-name image-type)
+        ((line bl:line)
+         (radial-vals bl:radial-gradient-values)
+         (rad-grad bl:gradient-core))
 
       (setup-window ctx -1.0 -1.0 1.0 1.0 fwidth fheight)
 
       (setf (bl:radial-gradient-values.x0 radial-vals) 0.0)
-      (setf (bl:radial-gradient-values.y0 radial-vals) 0.0)
+      (setf (bl:radial-gradient-values.y0 radial-vals) 0.5)
       (setf (bl:radial-gradient-values.x1 radial-vals) 0.0)
       (setf (bl:radial-gradient-values.y1 radial-vals) 0.0)
-      (setf (bl:radial-gradient-values.r0 radial-vals) 0.5)
+      (setf (bl:radial-gradient-values.r0 radial-vals) 0.25)
       (bl:gradient-init-as rad-grad
                            bl:+gradient-type-radial+
                            radial-vals
@@ -637,9 +578,10 @@
                            0
                            (cffi:null-pointer))
 
-      (bl:gradient-add-stop-rgba32 rad-grad 0.0 #16rff00ff00)
-      (bl:gradient-add-stop-rgba32 rad-grad 0.5 #16rff004400)
-      (bl:gradient-add-stop-rgba32 rad-grad 1.0 #16rff00aa00)
+      (bl:gradient-add-stop-rgba32 rad-grad 0.0 (+ #16raa000000 (random #16rffffff)))
+      (bl:gradient-add-stop-rgba32 rad-grad 0.5 (+ #16raa000000 (random #16rffffff)))
+      (bl:gradient-add-stop-rgba32 rad-grad 0.75 (+ #16raa000000 (random #16rffffff)))
+      (bl:gradient-add-stop-rgba32 rad-grad 1.0 (+ #16raa000000 (random #16rffffff)))
 
       (bl:context-set-comp-op ctx bl:+comp-op-src-over+)
       (bl:context-set-stroke-style ctx rad-grad)
@@ -668,38 +610,26 @@
                          (ndepth (- depth 1))
                          (ang (+ angle (- 90 (random 180.0)) (* i (/ (random 180.0) (1+ limbs))))))
                      (draw-tree nnx nny nl ang ndepth)))))))
-        (draw-tree 0.0 1.0 length -90.0 maxdepth))
-      (bl:context-end ctx)
-      (bl:image-codec-init codec)
-      (bl:image-codec-by-name codec "BMP")
-      (when (uiop/filesystem:file-exists-p real-file-name)
-        (delete-file real-file-name))
-      (bl:image-write-to-file img bmp-file-name codec))))
+        (draw-tree 0.0 1.0 length -90.0 maxdepth)))))
 
-(defun bl-fractal-wtf (bmp-file-name
-                        &key
-                          (width 1200) (height 1200)
-                          (length 1.0)
-                          (maxdepth 4)
-                          (limbs 2)
-                          )
+(defun bl-fractal-wtf (file-name
+                       &key
+                         (width 1200) (height 1200)
+                         (image-type "BMP")
+                         (length 1.0)
+                         (maxdepth 4)
+                         (limbs 2)
+                         )
   "Draw a fractal tree into the specified file, recursing to maxdepth, with the specified number of limbs at each level."
-  (let ((real-file-name (home-dir bmp-file-name))
+  (let ((real-file-name (home-dir file-name))
         (fwidth (coerce width 'double-float))
         (fheight (coerce height 'double-float)))
     (ensure-directories-exist real-file-name)
-    (bl:with-objects ((img bl:image-core)
-                      (ctx bl:context-core)
-                      (line bl:line)
-                      (codec bl:image-codec-core)
-                      (radial-vals bl:radial-gradient-values)
-                      (rad-grad bl:gradient-core))
-
-      (bl:image-init-as img width height bl:+format-prgb32+)
-
-      (bl:context-init-as ctx img (cffi:null-pointer))
-      (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
-      (bl:context-fill-all ctx)
+    (bl:with-image-context*
+        (img ctx file-name :width width :height height :codec-name image-type)
+        ((line bl:line)
+         (radial-vals bl:radial-gradient-values)
+         (rad-grad bl:gradient-core))
 
       (setup-window ctx -1.0 -1.0 1.0 1.0 fwidth fheight)
 
@@ -749,13 +679,7 @@
                          (ndepth (- depth 1))
                          (ang (+ angle (- 90 (random 180.0)) (* i (/ (random 180.0) (1+ limbs))))))
                      (draw-tree nnx nny nl ang ndepth)))))))
-        (draw-tree 0.0 1.0 length -90.0 maxdepth))
-      (bl:context-end ctx)
-      (bl:image-codec-init codec)
-      (bl:image-codec-by-name codec "BMP")
-      (when (uiop/filesystem:file-exists-p real-file-name)
-        (delete-file real-file-name))
-      (bl:image-write-to-file img bmp-file-name codec))))
+        (draw-tree 0.0 1.0 length -90.0 maxdepth)))))
 
 ;; (defstruct strange-attractor 
 ;;   (a 2.24 :type double-float)
@@ -849,6 +773,7 @@
                                              (count 1000)
                                              (width 1600)
                                              (height 1600)
+                                             (image-type "BMP")
                                              (open-bmp t)
                                              (jump-count 4)
                                              (t-min 0.0)
@@ -858,18 +783,11 @@
                                              (fx (lambda (tv) (cos tv)))
                                              (fy (lambda (tv) (sin tv))))
   (ensure-directories-exist file-name)
-  (bl:with-objects ((img bl:image-core)
-                    (ctx bl:context-core)
-                    (path bl:path-core)
-                    (codec bl:image-codec-core)
-                    (linear bl:linear-gradient-values)
-                    (grad bl:gradient-core))
-
-    (bl:image-init-as img width height bl:+format-prgb32+)
-
-    (bl:context-init-as ctx img (cffi:null-pointer))
-    (bl:context-set-comp-op ctx bl:+comp-op-src-copy+)
-    (bl:context-fill-all ctx)
+    (bl:with-image-context*
+        (img ctx file-name :width width :height height :codec-name image-type)
+        ((path bl:path-core)
+         (linear bl:linear-gradient-values)
+         (grad bl:gradient-core))
 
     (setf (bl:linear-gradient-values.x0 linear) 0.0d0)
     (setf (bl:linear-gradient-values.y0 linear) 0.0d0)
@@ -915,16 +833,7 @@
 
         
         (bl:path-reset path)
-        (bl:gradient-reset grad)))
-
-    (bl:context-end ctx)
-
-    (bl:image-codec-init codec)
-    (bl:image-codec-by-name codec "BMP")
-    (when (uiop/filesystem:file-exists-p file-name)
-      (delete-file file-name))
-
-    (bl:image-write-to-file img file-name codec))
+        (bl:gradient-reset grad))))
   (when open-bmp
     (swank:eval-in-emacs (list 'find-file-other-window (namestring file-name)))))
 
@@ -973,6 +882,7 @@
            (gen-art:random-parametric-cubics file-name
                                              :width width
                                              :height height
+                                             :image-type "BMP"
                                              :count cubic-count
                                              :open-bmp nil
                                              :stroke-width stroke-width
@@ -981,3 +891,46 @@
                                              :fx (lambda (tv) (* 1.5  (sin (* a tv)) (cos (* b tv)) (cos tv)))
                                              :fy (lambda (tv) (* 1.5  (sin (* c tv)) (cos (* d tv)) (sin tv))))))
     coeffs))
+
+(defun quadtree-viz (address file-name &key (width 800) (height 800) (image-type "BMP"))
+  (declare (ignorable address))
+  (bl:with-image-context*
+      (img ctx file-name
+           :width width
+           :height height
+           :codec-name image-type)
+      ((path bl:path-core)
+       (rect bl:round-rect))
+    (let* ((min-x 0.0)
+           (max-x (coerce width 'double-float))
+           (min-y 0.0)
+           (max-y (coerce width 'double-float))
+           (dx (- max-x min-x))
+           (dy (- max-y min-y)))
+      
+      (bl:lookup-error (bl:context-set-comp-op ctx bl:+comp-op-src-over+))
+      (bl:lookup-error (bl:context-set-fill-style-rgba32 ctx #16rffffffff))
+      
+      (loop for idx across address do
+           (setf (bl:round-rect.x rect) min-x)
+           (setf (bl:round-rect.y rect) min-y)
+           (setf (bl:round-rect.w rect) dx)
+           (setf (bl:round-rect.h rect) dy)
+           (setf (bl:round-rect.rx rect) (/ dx 4.0))
+           (setf (bl:round-rect.ry rect) (/ dy 4.0))
+
+           (bl:lookup-error (bl:context-fill-path-d ctx path))
+           (bl:lookup-error (bl:context-fill-geometry ctx bl:+geometry-type-round-rect+ rect))
+
+           (when (char= idx #\0)
+             (setf max-x (+ min-x (/ dx 2.0)))
+             (setf max-y (+ min-y (/ dy 2.0))))
+           (when (char= idx #\1)
+             (setf min-x (- max-x (/ dx 2.0)))
+             (setf max-y (+ min-y (/ dy 2.0))))
+           (when (char= idx #\2)
+             (setf min-x (- max-x (/ dx 2.0)))
+             (setf max-y (- max-y (/ dy 2.0))))
+           (when (char= idx #\3)
+             (setf min-x (+ max-x (/ dx 2.0)))
+             (setf max-y (- max-y (/ dy 2.0))))))))
